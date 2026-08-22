@@ -5,6 +5,26 @@
 > Is Codex on Windows getting slower over time? Long startup spins, UI freezes, failed task restores, and “ghost” entries stuck in the sidebar?  
 > **CodexCleaner audits and cleans both local task history and rebuildable performance caches so Codex can become responsive again.**
 
+## Quick Recovery: Startup or Focus-Switch Freezes
+
+Task-history cleanup and performance-cache cleanup are separate. If Codex still becomes “Not Responding,” spins the cursor, or stalls the input method after tasks were archived or deleted, audit the rebuildable desktop caches too.
+
+From the CodexCleaner directory, run the read-only audit first:
+
+```powershell
+python scripts/cache_maintenance.py audit
+```
+
+Review the reported targets and size. If cleanup is appropriate, **fully exit Codex from the system tray**, open an external PowerShell window, and run:
+
+```powershell
+python scripts/cache_maintenance.py clean --apply --relaunch
+```
+
+Alternatively, after Codex is fully closed, double-click `scripts\run_cache_cleanup.cmd`.
+
+The cleanup uses a fixed allowlist and moves rebuildable Chromium, Service Worker, code, and GPU caches into `%LOCALAPPDATA%\OpenAI\Codex-cache-backups\<timestamp>`. It preserves cookies, login state, Local Storage, IndexedDB, Session Storage, task history, and project files. The first restart may be slightly slower while caches rebuild; verify at least three browser-to-Codex focus switches afterward.
+
 ## Why This Skill Exists
 
 The problem was simple:
@@ -33,7 +53,7 @@ The exact environment and root cause vary from case to case, but one area was cl
 
 Later testing confirmed a second independent layer: **Chromium, Service Worker, code, and GPU caches**. Cleaning or archiving tasks does not clear these performance caches.
 
-We then ran two rounds of cleanup on our own Codex installation.
+We then ran three rounds of cleanup on our own Codex installation.
 
 ### Round One
 
@@ -67,7 +87,7 @@ Those caches were backed up and rebuilt while preserving login, task sessions, L
 
 The result is important: **task-history cleanup and performance-cache cleanup must be audited, confirmed, and verified as separate layers.**
 
-From those two rounds of cleanup, we turned the working criteria and operation order into a reusable workflow.
+From those three rounds of cleanup, we turned the working criteria and operation order into a reusable workflow.
 
 That became **CodexCleaner**.
 
@@ -125,7 +145,7 @@ In short:
 Clone or copy this directory into your user Skill directory:
 
 ```powershell
-git clone <repository-url> "$env:USERPROFILE\.codex\skills\codexcleaner"
+git clone https://github.com/Kynepen/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
 ```
 
 Codex will usually detect Skill changes automatically.

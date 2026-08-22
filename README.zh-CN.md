@@ -5,6 +5,26 @@
 > Windows 版 Codex 越用越卡？启动转圈、界面假死、任务恢复失败，左侧栏还挂着删不掉的“幽灵任务”？  
 > **CodexCleaner 会分别体检和整理本地任务历史与可重建性能缓存，让 Codex 真正恢复流畅。**
 
+## 快速恢复：启动慢、切回 Codex 假死
+
+任务历史清理和性能缓存清理是两个独立层级。如果任务已经归档或删除，Codex 仍然“未响应”、鼠标转圈或卡住输入法，还需要检查可重建桌面缓存。
+
+先在 CodexCleaner 目录运行只读审计：
+
+```powershell
+python scripts/cache_maintenance.py audit
+```
+
+核对目标目录和总大小；确认需要处理后，**从系统托盘彻底退出 Codex**，打开一个外部 PowerShell 窗口，再执行：
+
+```powershell
+python scripts/cache_maintenance.py clean --apply --relaunch
+```
+
+也可以在 Codex 完全退出后，双击 `scripts\run_cache_cleanup.cmd`。
+
+清理脚本只处理固定允许列表中的 Chromium、Service Worker、代码和 GPU 可重建缓存，并把它们移动到 `%LOCALAPPDATA%\OpenAI\Codex-cache-backups\<时间戳>`。Cookies、登录状态、Local Storage、IndexedDB、Session Storage、任务历史和项目文件都会保留。首次启动可能因重建缓存稍慢，之后至少验证三次“浏览器 → Codex”焦点切换。
+
 ## 为什么会有这个 Skill
 
 事情很简单：**Codex 前一天还正常，第二天打开突然开始卡。**
@@ -29,7 +49,7 @@
 
 后续实测又确认了第二个彼此独立的层级：**Chromium、Service Worker、代码和 GPU 缓存**。任务已经清空或归档，并不代表这些性能缓存也被清理。
 
-我们随后对本机 Codex 做了两轮实际整理。
+我们随后对本机 Codex 做了三轮实际整理。
 
 ### 第一轮
 
@@ -63,7 +83,7 @@
 
 这次结果说明：**任务历史清理和性能缓存清理必须分开审计、分开确认、分开验证。**
 
-这两轮整理跑下来，我们把判断标准和操作顺序整理成了一套可复用流程，于是有了 **CodexCleaner**。
+这三轮整理跑下来，我们把判断标准和操作顺序整理成了一套可复用流程，于是有了 **CodexCleaner**。
 
 它主要处理这些本地问题：
 
@@ -119,7 +139,7 @@
 把本目录克隆或复制到用户 Skill 目录：
 
 ```powershell
-git clone <仓库地址> "$env:USERPROFILE\.codex\skills\codexcleaner"
+git clone https://github.com/Kynepen/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
 ```
 
 Codex 通常会自动识别 Skill 变化。
