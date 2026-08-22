@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Cleaner"
-  short_description: "Audit and safely clean Codex task history"
-  default_prompt: "Use $codexcleaner to audit my Codex task history and prepare a safe cleanup plan."
+  short_description: "Clean Codex tasks and performance caches safely"
+  default_prompt: "Use $codexcleaner to audit both my Codex task history and rebuildable performance caches, then prepare a safe cleanup plan."

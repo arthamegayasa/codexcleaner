@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 > Is Codex on Windows getting slower over time? Long startup spins, UI freezes, failed task restores, and “ghost” entries stuck in the sidebar?  
-> **CodexCleaner is built to audit and clean up local Codex task history.**
+> **CodexCleaner audits and cleans both local task history and rebuildable performance caches so Codex can become responsive again.**
 
 ## Why This Skill Exists
 
@@ -31,6 +31,8 @@ The exact environment and root cause vary from case to case, but one area was cl
 
 **Codex task history, session storage, and sidebar indexes on Windows.**
 
+Later testing confirmed a second independent layer: **Chromium, Service Worker, code, and GPU caches**. Cleaning or archiving tasks does not clear these performance caches.
+
 We then ran two rounds of cleanup on our own Codex installation.
 
 ### Round One
@@ -57,6 +59,14 @@ Final result:
 
 After another restart, the active task list was much smaller, broken entries were gone, and task browsing remained smooth.
 
+### Round Three: Performance caches
+
+After task history had already been cleaned, Codex still briefly became “Not Responding” whenever focus returned from a browser, with cursor spins and input-method stalls. A read-only audit found about **384 MB** of rebuildable browser, Service Worker, code, and GPU caches.
+
+Those caches were backed up and rebuilt while preserving login, task sessions, Local Storage, IndexedDB, and project files. Startup and repeated focus switching became responsive again.
+
+The result is important: **task-history cleanup and performance-cache cleanup must be audited, confirmed, and verified as separate layers.**
+
 From those two rounds of cleanup, we turned the working criteria and operation order into a reusable workflow.
 
 That became **CodexCleaner**.
@@ -68,10 +78,12 @@ It focuses on local issues that can actually be inspected and handled:
 - hidden Guardian / derived records
 - sidebar index inconsistencies after official archive or delete operations
 - `no rollout found` cases related to mismatched history and cached indexes
+- oversized or long-lived Chromium, Service Worker, code, and GPU caches
+- slow startup, focus-switch freezes, and cursor spins that improve after cache rebuild
 
 System configuration, networking, client-version issues, and other external factors should still be checked with normal Codex diagnostics.
 
-**CodexCleaner has one clear job: audit, classify, confirm, clean, and verify.**
+**CodexCleaner has one clear job: audit task and cache layers separately, clean only confirmed targets, and verify real responsiveness afterward.**
 
 It first generates a clear **Keep / Archive / Permanently Delete** plan. After the user confirms the actions, it uses official Codex task operations and then verifies the resulting local storage state and sidebar list.
 
@@ -83,10 +95,13 @@ It first generates a clear **Keep / Archive / Permanently Delete** plan. After t
 | Archive | Removed from the active list | Fully preserved and can be restored | Finished or paused work that may still be useful |
 | Permanently Delete | Removed | Permanently deleted, including derived tasks | Tasks that are clearly no longer needed |
 | Repair Stale Index | Broken or stale entries are removed | Realigned with the history that actually exists | `no rollout found` and cache inconsistencies |
+| Rebuild Performance Cache | Task list stays unchanged | Login and task history stay intact | Slow startup, focus-switch freezes, and UI spins |
 
 ### Cleanup Scope
 
 **Project directories, Git repositories, source code, documents, and build artifacts are always outside CodexCleaner’s cleanup scope.**
+
+Performance-cache mode also protects cookies, login state, Local Storage, IndexedDB, Session Storage, WebStorage, and all task/session data under `$CODEX_HOME`. It moves cache directories into a timestamped backup instead of deleting them permanently.
 
 By default, **archive is the recommended option**.
 
@@ -125,7 +140,13 @@ Explicit invocation:
 $codexcleaner Audit my Codex tasks and suggest which ones to keep, archive, or permanently delete. Show me the full plan before making any changes.
 ```
 
-Default workflow:
+Performance diagnosis:
+
+```text
+$codexcleaner Codex is slow at startup and freezes after focus switching. Audit task history and rebuildable performance caches separately, then show the complete plan before any change.
+```
+
+Task-history workflow:
 
 1. Run a read-only audit.
 2. Review tasks individually and summarize task count and known size.
@@ -134,6 +155,8 @@ Default workflow:
 5. Verify storage state and the sidebar list afterward.
 
 **No destructive action should happen before user confirmation.**
+
+The performance-cache workflow also starts with an audit, requires confirmation and a fully closed Codex app, moves only fixed allowlisted rebuildable caches into a timestamped backup, and verifies at least three browser-to-Codex focus switches after restart. It never schedules periodic cache deletion.
 
 ## Read-Only Audit Tool
 
@@ -153,6 +176,21 @@ For custom database paths or protected task IDs:
 ```powershell
 python scripts/audit_codex.py --help
 ```
+
+Performance-cache audit:
+
+```powershell
+python scripts/cache_maintenance.py audit
+python scripts/cache_maintenance.py audit --json
+```
+
+After the user fully exits Codex from the system tray, run confirmed cleanup from an external terminal:
+
+```powershell
+python scripts/cache_maintenance.py clean --apply --relaunch
+```
+
+The visible `scripts\run_cache_cleanup.cmd` is also available and refuses to clean while `ChatGPT.exe` is still running.
 
 ## Environment and Scope
 

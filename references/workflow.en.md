@@ -4,6 +4,8 @@
 
 Help the user turn the Codex left sidebar into a clear, workable task set while fully preserving project directories, source code, and every task the user chooses to keep.
 
+This file covers task history and sidebar state only. When the user reports slow startup, focus-switch freezes, long cursor spins, or “Not Responding,” also read [cache-maintenance.en.md](cache-maintenance.en.md) and audit rebuildable caches. A clean task list does not imply clean performance caches.
+
 ## Three outcomes
 
 ### Keep
@@ -54,6 +56,8 @@ python scripts/audit_codex.py --json
 The helper reads task metadata, parent-child relationships, rollout existence, and file sizes. It does not read conversation bodies or change either database.
 
 Also run `codex doctor --summary` and record the Codex version and storage diagnostics. Keep the report local by default; review machine paths and task titles before sharing it.
+
+When the primary goal is responsiveness, run the read-only cache audit too. Report task-history size and performance-cache size separately; do not collapse them into a single “fully cleaned” conclusion.
 
 ### 2. Recommend outcomes
 
@@ -128,4 +132,3 @@ Treat database repair as a separate maintenance action with all of these conditi
 8. Backups remain available until the user verifies the restarted app.
 
 When the schema is unfamiliar, a writer is active, a database is locked, or the target set changes, preserve the current data and report the diagnosis. Repair scope stays limited to Codex task indexes and orphan metadata.
-
