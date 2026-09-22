@@ -77,10 +77,8 @@ Purge targets recorded quarantine files, never original source paths. Keep the m
 
 ## Use as a Codex skill
 
-Install the feature branch explicitly while the storage guard changes are awaiting merge:
-
 ```powershell
-git clone --branch feature/windows-storage-guard https://github.com/arthamegayasa/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
+git clone https://github.com/arthamegayasa/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
 ```
 
 ```text

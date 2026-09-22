@@ -85,10 +85,8 @@ Purge menghapus file karantina yang tercatat, bukan lokasi sumber. Persetujuan k
 
 ## Memakai skill
 
-Pilih cabang fitur ini secara eksplisit selama perubahan storage guard belum digabungkan:
-
 ```powershell
-git clone --branch feature/windows-storage-guard https://github.com/arthamegayasa/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
+git clone https://github.com/arthamegayasa/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
 ```
 
 ```text
