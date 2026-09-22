@@ -1,227 +1,114 @@
-# CodexCleaner
+# CodexCleaner — storage audit and recovery
 
-[简体中文](README.zh-CN.md)
+[Bahasa Indonesia](README.id.md) · [Original upstream Chinese guide](README.zh-CN.md)
 
-> Is Codex on Windows getting slower over time? Long startup spins, UI freezes, failed task restores, and “ghost” entries stuck in the sidebar?  
-> **CodexCleaner audits and cleans both local task history and rebuildable performance caches so Codex can become responsive again.**
+Audit Windows storage used by AI tools, distinguish caches from valuable work, and quarantine only reviewed disposable files. A large folder, an old timestamp, or a name containing `Temp` is not evidence that its contents can be discarded.
 
-## Quick Recovery: Startup or Focus-Switch Freezes
+> **Fork guidance:** this fork extends [Kynepen/codexcleaner](https://github.com/Kynepen/codexcleaner). For storage cleanup, this README, [SKILL.md](SKILL.md), and [storage-safety.md](references/storage-safety.md) are authoritative. The original Chinese documentation and older references are retained as upstream material. Task-history deletion is a separate, explicitly requested operation; it is not part of the storage cleanup workflow.
 
-Task-history cleanup and performance-cache cleanup are separate. If Codex still becomes “Not Responding,” spins the cursor, or stalls the input method after tasks were archived or deleted, audit the rebuildable desktop caches too.
+## Audit first
 
-From the CodexCleaner directory, run the read-only audit first:
+Requires Python 3.10 or later, with no additional Python packages. Audit and planning leave inspected files unchanged; apply, restore, and purge are Windows-only.
 
-```powershell
-python scripts/cache_maintenance.py audit
-```
-
-Review the reported targets and size. If cleanup is appropriate, **fully exit Codex from the system tray**, open an external PowerShell window, and run:
+From this repository, run:
 
 ```powershell
-python scripts/cache_maintenance.py clean --apply --relaunch
+New-Item -ItemType Directory -Path work -Force | Out-Null
+python scripts/storage_audit.py --only-roots --root "$env:LOCALAPPDATA" --json --output "work/storage-audit.json" --markdown "work/storage-audit.md"
 ```
 
-Alternatively, after Codex is fully closed, double-click `scripts\run_cache_cleanup.cmd`.
+Repeat `--root` for another location. `--only-roots` limits the scan to those locations; without it, default discovery adds known application locations. Choose fresh report names for each run: existing reports are not overwritten. Reports contain local paths, so keep them private. The audit reads filesystem metadata, reports inaccessible locations and skipped links, and does not read conversation bodies or document contents.
 
-The cleanup uses a fixed allowlist and moves rebuildable Chromium, Service Worker, code, and GPU caches into `%LOCALAPPDATA%\OpenAI\Codex-cache-backups\<timestamp>`. It preserves cookies, login state, Local Storage, IndexedDB, Session Storage, task history, and project files. The first restart may be slightly slower while caches rebuild; verify at least three browser-to-Codex focus switches afterward.
+Check the report's completeness and limit markers. The scan is bounded by time, entry count, directory count, and depth; an incomplete scan exits with status 1. Use narrower roots or adjust the limits shown by `--help` before treating an incomplete result as a full audit.
 
-## Why This Skill Exists
+Folder totals are **logical bytes per path**, not guaranteed recoverable disk space. Hardlinks, application virtualization aliases, sparse files, and nested totals can distort a naive sum. Two visible Codex profile paths can refer to the same directory. A `.vhdx` file can contain an entire working environment.
 
-The problem was simple:
+## Preserve work and state
 
-**Codex worked fine one day, then suddenly became painfully slow the next.**
+Projects, repositories, worktrees, source code, documents, databases, reports, exported images, archives, task history, credentials, and browser state are valuable data until reviewed otherwise. `LocalCache` can hold application state. Temp can hold the only copy of a report or backup.
 
-On the Windows Codex desktop app, we repeatedly ran into issues like:
+Repeated `neuroguide-report-*` or `neuroguide-research-*` folders are **review items**, not a deletion pattern. Review the exact directory, retained outputs, and active work before selecting a disposable subset. Built-in project/state markers add protection but cannot determine every file's value; configure protected roots for your own work.
 
-- noticeably slower startup
-- the cursor spinning for a long time
-- sluggish UI or full “Not Responding” states
-- no obvious CPU spike
-- no corresponding increase in fan activity
+## Plan, quarantine, restore, then purge separately
 
-At first, we assumed it was just a one-time initialization after an update.
+Read the [policy and safety reference](references/storage-safety.md) before planning cleanup. Save this empty policy as `policy.json`:
 
-Then it happened again.
+```json
+{
+  "version": 1,
+  "protected_roots": [],
+  "rules": []
+}
+```
 
-So we started digging.
-
-We also found many similar reports online: slow startup, frozen UI, failed task recovery, stale sidebar entries, and `no rollout found`.
-
-The exact environment and root cause vary from case to case, but one area was clearly worth inspecting:
-
-**Codex task history, session storage, and sidebar indexes on Windows.**
-
-Later testing confirmed a second independent layer: **Chromium, Service Worker, code, and GPU caches**. Cleaning or archiving tasks does not clear these performance caches.
-
-We then ran three rounds of cleanup on our own Codex installation.
-
-### Round One
-
-We permanently deleted 13 large tasks that were no longer needed, freeing about **338.60 MB** of session data.
-
-After restarting Codex, responsiveness improved.
-
-### Round Two
-
-We ran a full audit:
-
-- **145 task records** checked
-- **131 active records**
-- multiple oversized sessions found
-- a large number of hidden Guardian / derived tasks discovered
-
-Final result:
-
-- ✅ **6** active tasks kept
-- 📦 **16** useful tasks archived
-- 🗑️ **123** unnecessary records permanently deleted
-- 🧹 stale task indexes and ghost sidebar entries cleaned up
-
-After another restart, the active task list was much smaller, broken entries were gone, and task browsing remained smooth.
-
-### Round Three: Performance caches
-
-After task history had already been cleaned, Codex still briefly became “Not Responding” whenever focus returned from a browser, with cursor spins and input-method stalls. A read-only audit found about **384 MB** of rebuildable browser, Service Worker, code, and GPU caches.
-
-Those caches were backed up and rebuilt while preserving login, task sessions, Local Storage, IndexedDB, and project files. Startup and repeated focus switching became responsive again.
-
-The result is important: **task-history cleanup and performance-cache cleanup must be audited, confirmed, and verified as separate layers.**
-
-From those three rounds of cleanup, we turned the working criteria and operation order into a reusable workflow.
-
-That became **CodexCleaner**.
-
-It focuses on local issues that can actually be inspected and handled:
-
-- bloated task history
-- oversized sessions
-- hidden Guardian / derived records
-- sidebar index inconsistencies after official archive or delete operations
-- `no rollout found` cases related to mismatched history and cached indexes
-- oversized or long-lived Chromium, Service Worker, code, and GPU caches
-- slow startup, focus-switch freezes, and cursor spins that improve after cache rebuild
-
-System configuration, networking, client-version issues, and other external factors should still be checked with normal Codex diagnostics.
-
-**CodexCleaner has one clear job: audit task and cache layers separately, clean only confirmed targets, and verify real responsiveness afterward.**
-
-It first generates a clear **Keep / Archive / Permanently Delete** plan. After the user confirms the actions, it uses official Codex task operations and then verifies the resulting local storage state and sidebar list.
-
-## What Happens to the Sidebar
-
-| Action | Sidebar Result | Task History | Best For |
-| --- | --- | --- | --- |
-| Keep | Remains in the active list | Fully preserved | Current or important work |
-| Archive | Removed from the active list | Fully preserved and can be restored | Finished or paused work that may still be useful |
-| Permanently Delete | Removed | Permanently deleted, including derived tasks | Tasks that are clearly no longer needed |
-| Repair Stale Index | Broken or stale entries are removed | Realigned with the history that actually exists | `no rollout found` and cache inconsistencies |
-| Rebuild Performance Cache | Task list stays unchanged | Login and task history stay intact | Slow startup, focus-switch freezes, and UI spins |
-
-### Cleanup Scope
-
-**Project directories, Git repositories, source code, documents, and build artifacts are always outside CodexCleaner’s cleanup scope.**
-
-Performance-cache mode also protects cookies, login state, Local Storage, IndexedDB, Session Storage, WebStorage, and all task/session data under `$CODEX_HOME`. It moves cache directories into a timestamped backup instead of deleting them permanently.
-
-By default, **archive is the recommended option**.
-
-It keeps the active list focused while preserving the context you may want to continue or revisit later.
-
-**Permanent deletion should only be used for tasks that have been explicitly reviewed and confirmed as no longer valuable.**
-
-## Classification Rules
-
-- **Keep:** Current work, pinned tasks, unique context, or tasks you expect to continue soon.
-- **Archive:** Finished or paused tasks that still have reference, traceability, or future continuation value.
-- **Permanently Delete:** Tests, empty tasks, duplicates, finished one-off work, or broken records whose session files no longer exist.
-- **Undecided:** Anything that cannot be classified confidently stays recoverable until the user decides.
-
-In short:
-
-**Archive whenever possible. Permanently delete only after explicit confirmation.**
-
-## Installation
-
-Clone or copy this directory into your user Skill directory:
+Add project/output locations to `protected_roots`. Add a rule only for one exact reviewed disposable directory, with a reason. There is no default rule to empty Temp or an AI application profile.
 
 ```powershell
-git clone https://github.com/Kynepen/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
+python scripts/storage_guard.py plan --policy policy.json --output plan.json
 ```
 
-Codex will usually detect Skill changes automatically.
+Review the selected files, skipped/protected entries, sizes, and printed plan ID. Use a fresh output name when making another plan. Empty rules select nothing. The minimum file age is **seven days**. Plans expire after **24 hours**; apply revalidates the selection and skips changed files. A `reviewed_temp` directory is excluded as a whole when preflight detects changed or ineligible contents.
 
-If the new Skill does not appear, restart Codex once.
+Audit uses metadata only. Planning reads candidate file bytes for protection checks and SHA-256 fingerprints; quarantine and recovery verify content integrity. The tools run locally without an API key or network upload.
 
-## Usage
+After the exact scope is authorized, finish active work and close the relevant AI tools normally. Run mutations from an **external PowerShell terminal**. The guard refuses mutations when relevant AI/tool processes are running or process inspection fails. It never force-closes applications.
 
-Explicit invocation:
+```powershell
+python scripts/storage_guard.py apply --plan plan.json --policy policy.json --quarantine-root "D:\CodexCleaner-Quarantine" --confirm PLAN_ID
+```
+
+Replace `PLAN_ID` with the printed ID and choose a real quarantine volume with sufficient space. Quarantine must be outside the source and protected roots. A verified copy to another volume can release source-volume space while retaining recovery data. Quarantine on the same volume **does not free space** on that volume.
+
+Keep the **entire quarantine run directory in its original location**, including `manifest.json`, `journal.jsonl`, and `files`. The journal records progress before removal and supports recovery after interruption. For reviewed Temp bundles, the guard locks and verifies copies of all selected members before removing any source. This is not an atomic filesystem transaction: a crash or concurrent activity can still leave a partial run. Preserve verified copies and inspect the recorded results.
+
+This is a recovery path for disposable files, not a complete backup: original NTFS permissions/ACLs are not backed up. To restore, use the run ID recorded in the manifest:
+
+```powershell
+python scripts/storage_guard.py restore --manifest "D:\CodexCleaner-Quarantine\RUN_DIRECTORY\manifest.json" --confirm RUN_ID
+```
+
+Verify normal operation and required outputs. Permanent removal requires a **separate decision** and at least **seven days of quarantine retention**:
+
+```powershell
+python scripts/storage_guard.py purge --manifest "D:\CodexCleaner-Quarantine\RUN_DIRECTORY\manifest.json" --confirm RUN_ID
+```
+
+Purge targets recorded quarantine files, never original source paths. Keep the manifest as an audit trail. See the [reference](references/storage-safety.md) for process blockers, interrupted runs, and restore conflicts. This workflow does not schedule automatic cleanup.
+
+## Use as a Codex skill
+
+Install the feature branch explicitly while the storage guard changes are awaiting merge:
+
+```powershell
+git clone --branch feature/windows-storage-guard https://github.com/arthamegayasa/codexcleaner.git "$env:USERPROFILE\.codex\skills\codexcleaner"
+```
 
 ```text
-$codexcleaner Audit my Codex tasks and suggest which ones to keep, archive, or permanently delete. Show me the full plan before making any changes.
+$codexcleaner Audit the folders consuming space on C. Separate disposable caches from projects, history, application state, and generated outputs. Show findings before proposing changes.
 ```
 
-Performance diagnosis:
+## Task history and older helpers
 
-```text
-$codexcleaner Codex is slow at startup and freezes after focus switching. Audit task history and rebuildable performance caches separately, then show the complete plan before any change.
-```
-
-Task-history workflow:
-
-1. Run a read-only audit.
-2. Review tasks individually and summarize task count and known size.
-3. Confirm the archive list and permanent-delete list separately.
-4. Use official Codex archive and delete operations.
-5. Verify storage state and the sidebar list afterward.
-
-**No destructive action should happen before user confirmation.**
-
-The performance-cache workflow also starts with an audit, requires confirmation and a fully closed Codex app, moves only fixed allowlisted rebuildable caches into a timestamped backup, and verifies at least three browser-to-Codex focus switches after restart. It never schedules periodic cache deletion.
-
-## Read-Only Audit Tool
-
-The project includes a read-only audit script that uses only the Python standard library:
+The upstream metadata-only task audit remains available:
 
 ```powershell
-python scripts/audit_codex.py
 python scripts/audit_codex.py --json
 ```
 
-The script reads task metadata and file sizes only.
+A request to free disk space does not authorize removing task history. For separately requested task management, use supported official task operations available in the current environment. Direct database editing or repair is outside the recommended workflow.
 
-**It does not read conversation bodies and does not modify Codex data.**
+The older `cache_maintenance.py`, launcher, and references remain for upstream continuity. The launcher audits by default and requires `--apply` for changes. The legacy helper preserves all Service Worker data and moves allowed caches only by same-volume rename; it rejects cross-volume backups, frees no space through that move, and never automatically purges backups.
 
-For custom database paths or protected task IDs:
+Use `storage_guard.py` for this fork's reviewed storage cleanup, including verified cross-volume quarantine. Its policy, run directory, journal, and retention workflow are separate from legacy cache backups; their manifests are not interchangeable. See the [updated English legacy reference](references/cache-maintenance.en.md) only when that helper is specifically needed.
 
-```powershell
-python scripts/audit_codex.py --help
-```
-
-Performance-cache audit:
+## Development
 
 ```powershell
-python scripts/cache_maintenance.py audit
-python scripts/cache_maintenance.py audit --json
+python -m unittest discover -s tests -v
 ```
 
-After the user fully exits Codex from the system tray, run confirmed cleanup from an external terminal:
+CI runs unittest on Windows and Ubuntu with Python 3.10 and 3.13. Tests use temporary fixtures, not a developer's real profile. Windows remains the supported mutation platform.
 
-```powershell
-python scripts/cache_maintenance.py clean --apply --relaunch
-```
+## Attribution
 
-The visible `scripts\run_cache_cleanup.cmd` is also available and refuses to clean while `ChatGPT.exe` is still running.
-
-## Environment and Scope
-
-- Windows 10 or Windows 11
-- A current Codex CLI version with `doctor`, `archive`, `unarchive`, and `delete`
-- Python 3.9+ for the optional audit script
-
-Codex task storage is an implementation detail that may evolve over time.
-
-For that reason, CodexCleaner prioritizes official task operations whenever possible.
-
-Direct database repair is treated as a separate maintenance workflow that requires explicit confirmation, backups, and integrity checks.
-
-For official semantics, see [Codex App Server API Overview](https://learn.chatgpt.com/docs/app-server#api-overview).
+Upstream: [Kynepen/codexcleaner](https://github.com/Kynepen/codexcleaner). Fork: [arthamegayasa/codexcleaner](https://github.com/arthamegayasa/codexcleaner). Upstream history and the original Chinese documentation are preserved. The imported upstream snapshot did not include a `LICENSE` file; this fork does not introduce or infer a license grant.

@@ -4,3 +4,11 @@ __pycache__/
 audit-*.json
 audit-*.md
 
+# Local storage reports/policies can expose private paths.
+/work/
+/policy.json
+/plan.json
+/storage-audit.json
+/storage-audit.md
+/quarantine/
+

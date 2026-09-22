@@ -1,4 +1,4 @@
 interface:
-  display_name: "Codex Cleaner"
-  short_description: "Clean Codex tasks and performance caches safely"
-  default_prompt: "Use $codexcleaner to audit both my Codex task history and rebuildable performance caches, then prepare a safe cleanup plan."
+  display_name: "CodexCleaner Storage Guard"
+  short_description: "Audit storage and quarantine reviewed disposable files"
+  default_prompt: "Use $codexcleaner to audit Windows storage, preserve projects and outputs, and prepare a reviewed cleanup plan before changing files."

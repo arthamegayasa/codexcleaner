@@ -1,36 +1,47 @@
 @echo off
 setlocal
 chcp 65001 >nul
-title CodexCleaner 性能缓存清理
+title CodexCleaner cache maintenance
 
-tasklist.exe /FI "IMAGENAME eq ChatGPT.exe" /FO CSV /NH 2>nul | findstr.exe /I /C:"ChatGPT.exe" >nul
-if not errorlevel 1 (
-  echo Codex / ChatGPT 仍在运行。
-  echo 请先从系统托盘彻底退出应用，再重新双击本工具。
-  pause
-  exit /b 3
+rem Default to read-only audit. Python owns the fail-closed process checks.
+set "CACHE_COMMAND=audit"
+if "%~1"=="--apply" (
+  if not "%~2"=="" goto usage
+  set "CACHE_COMMAND=clean --apply --relaunch"
+) else (
+  if not "%~1"=="" goto usage
 )
 
 where.exe py.exe >nul 2>nul
 if not errorlevel 1 (
-  py.exe -3 "%~dp0cache_maintenance.py" clean --apply --relaunch
+  py.exe -3 "%~dp0cache_maintenance.py" %CACHE_COMMAND%
 ) else (
   where.exe python.exe >nul 2>nul
   if errorlevel 1 (
-    echo 找不到 Python 3。请在 Codex 中运行缓存清理工作流。
+    echo Python 3 was not found. Install Python before using this helper.
     pause
     exit /b 2
   )
-  python.exe "%~dp0cache_maintenance.py" clean --apply --relaunch
+  python.exe "%~dp0cache_maintenance.py" %CACHE_COMMAND%
 )
 
 set "CLEAN_EXIT=%ERRORLEVEL%"
+echo.
 if not "%CLEAN_EXIT%"=="0" (
-  echo.
-  echo 清理没有完整完成，错误码：%CLEAN_EXIT%。请保留窗口内容并交给 Codex 检查。
+  echo Maintenance stopped with code %CLEAN_EXIT%. Keep the report for review.
 ) else (
-  echo.
-  echo 可重建缓存已备份并清理，Codex 正在重新启动。
+  if "%~1"=="--apply" (
+    echo Cache directories were moved to a backup on the same volume.
+    echo This does not reclaim disk space. No backups are automatically deleted.
+  ) else (
+    echo Read-only audit completed. Nothing was moved or deleted.
+    echo To apply: fully exit Codex desktop and CLI sessions, then run this file with --apply.
+  )
 )
 pause
 exit /b %CLEAN_EXIT%
+
+:usage
+echo Usage: run_cache_cleanup.cmd [--apply]
+echo Without --apply, this helper only audits cache sizes.
+exit /b 2

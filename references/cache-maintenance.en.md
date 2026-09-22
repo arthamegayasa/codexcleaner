@@ -1,10 +1,12 @@
 # CodexCleaner performance-cache maintenance (English)
 
+> **Fork note:** this is the legacy performance helper. For current storage cleanup, follow [storage-safety.md](storage-safety.md) and the [fork README](../README.md). The legacy helper preserves all Service Worker data, uses same-volume cache renames only, and has no automatic backup purge. Its launcher audits by default; changes require `--apply`. Its backups and manifests are separate from the new storage guard's verified cross-volume quarantine and journal. The Chinese references remain archival upstream material.
+
 ## Goal and trigger
 
 Diagnose and clear rebuildable browser caches used by the Windows Codex desktop app when symptoms include slow startup, freezes after switching back from another window, long cursor spins, input-method stalls, or brief “Not Responding” states.
 
-Cache maintenance and task-history cleanup are separate layers. A small task list or a completed archive/delete pass does not prove that Chromium, Service Worker, code, or GPU caches are healthy.
+Cache maintenance and task-history cleanup are separate layers. A small task list or a completed archive/delete pass does not establish the condition of Chromium HTTP, code, or GPU caches.
 
 Do not use cache cleanup as scheduled maintenance. Run it only when relevant symptoms recur or a read-only audit shows unusually large or long-lived caches.
 
@@ -17,7 +19,7 @@ python scripts/cache_maintenance.py audit
 python scripts/cache_maintenance.py audit --json
 ```
 
-The report separates GPU, HTTP, code, Service Worker, and component caches and inventories existing backups. It does not modify files.
+The report inventories allowed cache targets and existing backups, and reports protected profile locations. All Service Worker data is preserved. Audit does not modify files.
 
 For a performance diagnosis, also record:
 
@@ -35,7 +37,6 @@ The helper uses a fixed allowlist and moves only these rebuildable categories:
 
 - Chromium HTTP Cache and Code Cache;
 - GPUCache, ShaderCache, and Dawn/WebGPU/Graphite caches;
-- Service Worker data in the `codex-browser-app` partition;
 - Chromium component and extension-package caches.
 
 Always preserve:
@@ -43,10 +44,11 @@ Always preserve:
 - cookies, login, and authentication state;
 - Local Storage, IndexedDB, Session Storage, and WebStorage;
 - Network directories and other partition site state;
+- all Service Worker directories, including the `codex-browser-app` partition;
 - active tasks, archived tasks, rollout sessions, and databases under `$CODEX_HOME`;
 - project directories, Git repositories, source code, documents, and build artifacts.
 
-The helper moves caches into `%LOCALAPPDATA%\OpenAI\Codex-cache-backups\<timestamp>` instead of deleting them and writes `manifest.json`. Keep the backup until the user confirms login, tasks, and responsiveness are intact; normally request separate confirmation before removing it after 24–48 stable hours.
+The helper renames caches into `%LOCALAPPDATA%\OpenAI\Codex-cache-backups\<timestamp>` on the same volume and writes `manifest.json`. Cross-volume backups are refused. Each directory rename is atomic, but the complete batch is not an atomic transaction. A same-volume move does not free disk space. Keep backups until their role and application behavior have been verified; this helper never purges them automatically. Permanent removal requires a separate reviewed decision. Do not pass a legacy backup manifest to `storage_guard.py`.
 
 ## Confirmation
 
@@ -58,7 +60,7 @@ Before cleanup, show:
 - the requirement to fully exit Codex;
 - that the first restart may be slightly slower while caches rebuild.
 
-Confirmation covers the current audit result. Re-audit and reconfirm if the target set or size changes materially.
+Authorization must cover the current reviewed target set. Reuse existing explicit authorization when it covers that concrete action and scope; obtain missing authorization if the scope changes materially.
 
 ## Execute only after the app is closed
 
@@ -70,7 +72,7 @@ Windows can terminate ordinary child processes when Codex exits, so a background
    python scripts/cache_maintenance.py clean --apply --relaunch
    ```
 
-2. Use the visible `scripts\run_cache_cleanup.cmd`. It refuses to clean while `ChatGPT.exe` is running; after the user exits the app, run it again.
+2. Run `scripts\run_cache_cleanup.cmd --apply` in an external terminal. Without `--apply`, the launcher performs a read-only audit. Changes are refused while Codex/ChatGPT desktop or CLI/helper processes are running, or process inspection fails. Close them normally before retrying; the helper never force-closes them.
 
 Use `--wait-seconds` only from an independently hosted Windows task when the host supports it and the user authorizes it. Verify that the task is actually running and its independent process exists; if the task captures a status log, verify the waiting stage there too. Remove the exact one-time task after completion. Do not rely on a normal process spawned by Codex itself.
 
